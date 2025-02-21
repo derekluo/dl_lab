@@ -38,7 +38,6 @@ ENV/
 
 # Jupyter Notebook
 .ipynb_checkpoints
-*.ipynb
 
 # Training artifacts
 models/
@@ -61,3 +60,11 @@ data/
 .DS_Store
 Thumbs.db
 *.log 
+
+*.pt
+*.pth
+*.pth.tar
+*.pth.tar.gz
+*.pth.tar.bz2
+*.pth.tar.xz
+*.pth.tar.lzma
