@@ -48,3 +48,19 @@ A simplified implementation of the Stable Diffusion architecture, focused on edu
 - `stable_diffusion_from_scratch/model.py` - Core architecture including UNet with attention
 - `stable_diffusion_from_scratch/train.py` - Training pipeline
 - `stable_diffusion_from_scratch/inference.py` - Image generation utilities
+
+### 7. AlexNet
+Implementation of AlexNet, the revolutionary CNN architecture that won the 2012 ImageNet competition and sparked the deep learning revolution in computer vision.
+
+Files:
+- `alexnet_from_scratch/alexnet.py` - Model architecture with 5 convolutional layers and 3 fully connected layers
+- `alexnet_from_scratch/train.py` - Training pipeline with ImageNet preprocessing and SGD optimizer
+- `alexnet_from_scratch/inference.py` - Inference utilities with support for top-k predictions
+
+Features:
+- Original AlexNet architecture
+- ImageNet-style preprocessing
+- GPU support
+- Configurable number of output classes
+- Top-k prediction capabilities
+- Support for custom class labels
