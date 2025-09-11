@@ -1,70 +1,63 @@
-# Python
+# Python cache
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
+*.pyd
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 
-# Virtual Environment
+# Virtual environments
 venv/
 env/
 ENV/
-.env
 .venv
 
-# IDE
-.idea/
+# IDE files
 .vscode/
+.idea/
 *.swp
 *.swo
-.project
-.pydevproject
-.settings/
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Training artifacts
-models/
-runs/
-.aim/
-wandb/
-logs/
-checkpoints/
-
-# Data
-data/
-*.txt
-*.csv
-*.json
-*.jsonl
-*.db
-*.sqlite
-
-# OS
+# OS files
 .DS_Store
 Thumbs.db
-*.log 
 
-*.pt
+# Jupyter notebooks
+.ipynb_checkpoints/
+
+# Model files
 *.pth
-*.pth.tar
-*.pth.tar.gz
-*.pth.tar.bz2
-*.pth.tar.xz
-*.pth.tar.lzma
+*.pt
+*.pkl
+*.h5
+
+# Data directories
+data/
+datasets/
+
+# Generated images and results
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# PyTorch Lightning logs
+lightning_logs/
+
+# TensorBoard logs
+runs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation builds
+docs/_build/

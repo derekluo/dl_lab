@@ -1,6 +1,6 @@
-# LLM Lab
+# GPT-2 From Scratch
 
-A training and inference framework for Large Language Models (LLMs).
+A from-scratch implementation of the GPT-2 architecture for language modeling and text generation.
 
 ## Project Structure
 
