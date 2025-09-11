@@ -2,12 +2,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
-from sklearn.datasets import fetch_20newsgroups
 from sklearn.model_selection import train_test_split
 from collections import Counter
 import numpy as np
 import re
-from transformer import SimpleTransformer
+import matplotlib.pyplot as plt
+from model import SimpleTransformer
 
 class TextDataset(Dataset):
     """Simple text dataset for demonstration"""
@@ -16,180 +16,111 @@ class TextDataset(Dataset):
         self.labels = labels
         self.vocab = vocab
         self.max_length = max_length
-
+        
     def __len__(self):
         return len(self.texts)
-
+    
     def __getitem__(self, idx):
         text = self.texts[idx]
         label = self.labels[idx]
-
+        
         # Simple tokenization and encoding
         tokens = self.tokenize(text)
         encoded = self.encode_tokens(tokens)
-
+        
         return torch.tensor(encoded, dtype=torch.long), torch.tensor(label, dtype=torch.long)
-
+    
     def tokenize(self, text):
         # Simple tokenization: lowercase and split on whitespace/punctuation
         text = text.lower()
         text = re.sub(r'[^\w\s]', ' ', text)
         tokens = text.split()
         return tokens[:self.max_length]
-
+    
     def encode_tokens(self, tokens):
         # Encode tokens to indices, pad to max_length
         encoded = [self.vocab.get(token, self.vocab['<UNK>']) for token in tokens]
-
+        
         # Pad or truncate to max_length
         if len(encoded) < self.max_length:
             encoded.extend([self.vocab['<PAD>']] * (self.max_length - len(encoded)))
         else:
             encoded = encoded[:self.max_length]
-
+            
         return encoded
 
-def build_vocab(texts, min_freq=2, max_vocab_size=10000):
+def build_vocab(texts, min_freq=2, max_vocab_size=5000):
     """Build vocabulary from texts"""
-    # Tokenize all texts and count words
     word_counts = Counter()
     for text in texts:
         text = text.lower()
         text = re.sub(r'[^\w\s]', ' ', text)
         tokens = text.split()
         word_counts.update(tokens)
-
-    # Create vocabulary
+    
     vocab = {'<PAD>': 0, '<UNK>': 1}
-
-    # Add most frequent words
     most_common = word_counts.most_common(max_vocab_size - 2)
     for word, count in most_common:
         if count >= min_freq:
             vocab[word] = len(vocab)
-
+    
     return vocab
 
-def train_epoch(model, device, train_loader, optimizer, criterion, epoch):
-    """Train for one epoch"""
-    model.train()
-    total_loss = 0
-    correct = 0
-    total = 0
-
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-
-        optimizer.zero_grad()
-        output = model(data)
-        loss = criterion(output, target)
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-        pred = output.argmax(dim=1)
-        correct += pred.eq(target).sum().item()
-        total += target.size(0)
-
-        if batch_idx % 50 == 0:
-            print(f'Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} '
-                  f'({100. * batch_idx / len(train_loader):.0f}%)]\t'
-                  f'Loss: {loss.item():.6f}')
-
-    avg_loss = total_loss / len(train_loader)
-    accuracy = 100. * correct / total
-    print(f'Train Epoch: {epoch} - Average Loss: {avg_loss:.6f}, Accuracy: {accuracy:.2f}%')
-
-    return avg_loss, accuracy
-
-def test(model, device, test_loader, criterion):
-    """Test the model"""
-    model.eval()
-    test_loss = 0
-    correct = 0
-    total = 0
-
-    with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            test_loss += criterion(output, target).item()
-            pred = output.argmax(dim=1)
-            correct += pred.eq(target).sum().item()
-            total += target.size(0)
-
-    avg_loss = test_loss / len(test_loader)
-    accuracy = 100. * correct / total
-    print(f'Test - Average Loss: {avg_loss:.6f}, '
-          f'Accuracy: {correct}/{total} ({accuracy:.2f}%)\n')
-
-    return avg_loss, accuracy
-
-def create_sample_data(num_samples=1000, num_classes=5):
+def create_sample_data(num_samples=2000, num_classes=5):
     """Create sample text data for demonstration"""
-    # Create simple synthetic data
     texts = []
     labels = []
-
+    
     # Simple patterns for different classes
     patterns = [
-        ["computer", "software", "technology", "programming", "code"],
-        ["sports", "football", "basketball", "game", "team"],
-        ["science", "research", "experiment", "theory", "study"],
-        ["music", "song", "artist", "album", "concert"],
-        ["food", "restaurant", "cooking", "recipe", "delicious"]
+        ["computer", "software", "technology", "programming", "code", "algorithm", "data", "system"],
+        ["sports", "football", "basketball", "game", "team", "player", "match", "score"],
+        ["science", "research", "experiment", "theory", "study", "analysis", "discovery", "method"],
+        ["music", "song", "artist", "album", "concert", "melody", "rhythm", "instrument"],
+        ["food", "restaurant", "cooking", "recipe", "delicious", "taste", "ingredient", "meal"]
     ]
-
+    
     for i in range(num_samples):
         class_idx = i % num_classes
-        # Create a simple sentence using words from the pattern
-        words = np.random.choice(patterns[class_idx], size=np.random.randint(5, 15))
+        # Create a sentence using words from the pattern
+        words = np.random.choice(patterns[class_idx], size=np.random.randint(8, 20))
         text = " ".join(words)
         texts.append(text)
         labels.append(class_idx)
-
+    
     return texts, labels
 
-def main():
-    # Set random seed for reproducibility
-    torch.manual_seed(42)
-    np.random.seed(42)
-
-    # Check if CUDA is available
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def train_model(num_epochs=15, batch_size=32, learning_rate=0.001):
+    # Set device
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
-
-    # Training parameters
-    batch_size = 32
-    epochs = 10
-    learning_rate = 0.001
-    max_length = 64
-
-    # Create sample data (in practice, you would load real text data)
+    
+    # Create sample data
     print("Creating sample data...")
     texts, labels = create_sample_data(num_samples=2000, num_classes=5)
-
+    
     # Split data
     train_texts, test_texts, train_labels, test_labels = train_test_split(
         texts, labels, test_size=0.2, random_state=42, stratify=labels
     )
-
+    
     # Build vocabulary
     print("Building vocabulary...")
     vocab = build_vocab(train_texts, min_freq=1, max_vocab_size=5000)
     vocab_size = len(vocab)
     num_classes = len(set(labels))
-
+    
     print(f"Vocabulary size: {vocab_size}")
     print(f"Number of classes: {num_classes}")
-
+    
     # Create datasets and dataloaders
+    max_length = 64
     train_dataset = TextDataset(train_texts, train_labels, vocab, max_length)
     test_dataset = TextDataset(test_texts, test_labels, vocab, max_length)
-
+    
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
+    
     # Initialize model
     model = SimpleTransformer(
         vocab_size=vocab_size,
@@ -199,26 +130,93 @@ def main():
         num_classes=num_classes,
         max_length=max_length
     ).to(device)
-
+    
     # Loss function and optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
+    
     print(f"\nModel has {sum(p.numel() for p in model.parameters()):,} parameters")
     print("Starting training...\n")
-
+    
     # Training loop
-    best_test_acc = 0
-    for epoch in range(1, epochs + 1):
-        train_loss, train_acc = train_epoch(model, device, train_loader, optimizer, criterion, epoch)
-        test_loss, test_acc = test(model, device, test_loader, criterion)
-
-        if test_acc > best_test_acc:
-            best_test_acc = test_acc
-            torch.save(model.state_dict(), 'transformer_best.pth')
-            print(f"New best model saved with test accuracy: {best_test_acc:.2f}%")
-
-    print(f"\nTraining completed. Best test accuracy: {best_test_acc:.2f}%")
+    train_losses = []
+    test_accuracies = []
+    
+    for epoch in range(num_epochs):
+        model.train()
+        running_loss = 0.0
+        
+        for data, target in train_loader:
+            data, target = data.to(device), target.to(device)
+            
+            optimizer.zero_grad()
+            output = model(data)
+            loss = criterion(output, target)
+            loss.backward()
+            optimizer.step()
+            
+            running_loss += loss.item()
+        
+        # Calculate average loss for the epoch
+        epoch_loss = running_loss / len(train_loader)
+        train_losses.append(epoch_loss)
+        
+        # Evaluate model
+        model.eval()
+        correct = 0
+        total = 0
+        
+        with torch.no_grad():
+            for data, target in test_loader:
+                data, target = data.to(device), target.to(device)
+                output = model(data)
+                _, predicted = torch.max(output.data, 1)
+                total += target.size(0)
+                correct += (predicted == target).sum().item()
+        
+        accuracy = 100 * correct / total
+        test_accuracies.append(accuracy)
+        
+        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}, Accuracy: {accuracy:.2f}%')
+    
+    # Save the model and vocabulary
+    torch.save({
+        'model_state_dict': model.state_dict(),
+        'vocab': vocab,
+        'model_config': {
+            'vocab_size': vocab_size,
+            'd_model': 128,
+            'n_heads': 4,
+            'n_layers': 2,
+            'num_classes': num_classes,
+            'max_length': max_length
+        }
+    }, 'transformer_model.pth')
+    
+    # Plot training results
+    plt.figure(figsize=(12, 4))
+    
+    plt.subplot(1, 2, 1)
+    plt.plot(train_losses)
+    plt.title('Training Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.grid(True)
+    
+    plt.subplot(1, 2, 2)
+    plt.plot(test_accuracies)
+    plt.title('Test Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy (%)')
+    plt.grid(True)
+    
+    plt.tight_layout()
+    plt.savefig('training_results.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f"\nTraining completed. Final accuracy: {test_accuracies[-1]:.2f}%")
+    print("Model saved as 'transformer_model.pth'")
+    print("Training results saved as 'training_results.png'")
 
 if __name__ == '__main__':
-    main()
+    train_model()

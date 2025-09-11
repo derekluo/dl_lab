@@ -1,0 +1,31 @@
+# Model files
+*.pth
+transformer_best.pth
+transformer_model.pth
+
+# Training results
+training_results.png
+
+# Test data
+test_texts/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Data directories
+data/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
