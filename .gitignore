@@ -61,3 +61,5 @@ htmlcov/
 
 # Documentation builds
 docs/_build/
+.gemini/
+gha-creds-*.json
