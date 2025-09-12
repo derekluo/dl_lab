@@ -1,107 +1,70 @@
+# Diffusion Model From Scratch
 
-# 从零开始实现 DDPM
+This project implements a text-conditioned Denoising Diffusion Probabilistic Model (DDPM) from scratch using PyTorch. The model is trained on a small dataset of Pokémon images with corresponding text captions to generate new images based on textual prompts.
 
-这里是我在视频中讲解的代码，主要是关于Diffusion模型的实现。
+This implementation is designed for educational purposes to demonstrate the core components of a modern conditional diffusion model, including a U-Net with Spatial Transformer attention blocks.
 
-使用了一个800张照片的pokemon的小规模图片数据集，演示从零开始的训练过程。
+## Architecture
 
-由于是从零训练并没有依赖任何预训练的模型，展示了 Diffusion + Spatial Transformer + Attention + Unet （这些模块合在一起就是比较现代的DDPM模型了），模型只作为教学示例。
+The model is based on a U-Net architecture enhanced with attention mechanisms to incorporate text conditioning.
 
-下一个视频我再来用 VAE + DDPM 来实现一个接近 Stable Diffusion 2 的模型架构。
+-   **U-Net Backbone**: The core of the model is a U-Net that predicts the noise added to an image at a given timestep. It consists of down-sampling blocks, a middle block, and up-sampling blocks with skip connections.
+-   **Text Conditioning**: The model is conditioned on text prompts, which are encoded using a pre-trained CLIP text encoder.
+-   **Spatial Transformer**: The U-Net is augmented with `SpatialTransformer` blocks, which use cross-attention to integrate the text embeddings into the image generation process. This allows the model to learn relationships between the text and image features.
+-   **Noise Scheduler**: A cosine noise scheduler is used to manage the forward (noising) and reverse (denoising) processes.
 
-在本地 Mac M3 上训练大概需要16G内存，大概需要2～4小时。如果要达到更好的效果，则需使用更大的数据集和算力。
+## File Structure
 
-#### 需要安装的库：
+-   `diffusion_model.py`: Contains the complete implementation of the U-Net architecture with `ResnetBlock` and `SpatialTransformer` components, the `NoiseScheduler`, and the sampling functions.
+-   `train_diffusion.py`: The main training script. It handles data loading, text encoding, the training loop, model checkpointing, and logging to Weights & Biases.
+-   `sample_diffusion.py`: A script for generating images from a trained model using a text prompt. It supports both standard and Classifier-Free Guidance (CFG) sampling.
+-   `diffusion_results/`: A directory where model checkpoints and generated sample images are saved.
+-   `README.md`: This documentation file.
+
+## Usage
+
+### 1. Prerequisites
+Install the required Python libraries:
+```bash
+pip install torch torchvision pillow numpy tqdm datasets transformers wandb
 ```
-numpy
-torch
-torchvision
-Pillow
-datasets
-transformers
-PIL
-tdqm
-datasets
+You will also need to log in to Weights & Biases to track the training progress:
+```bash
+wandb login
 ```
 
-#### 训练图片数据集：
+### 2. Training the Model
+To start training the diffusion model, run the training script:
+```bash
+python train_diffusion.py
+```
+The script will automatically download the Pokémon dataset from the Hugging Face Hub. During training, it will:
+-   Log the training and validation loss to Weights & Biases.
+-   Save model checkpoints periodically to the `diffusion_results/` directory.
+-   Generate and save sample images at regular intervals to visualize the model's progress.
 
-运行`train_diffusion.py`会从huggingface上下载一个[pokemon](https://huggingface.co/datasets/svjack/pokemon-blip-captions-en-zh)的小规模图片数据集。
+### 3. Generating Images
+After training, you can generate new images using the `sample_diffusion.py` script.
 
-当然，你也可以在代码中替换成本地的其他图片数据集。
+1.  **Update the script**: Open `sample_diffusion.py` and set the path to your trained model checkpoint.
+2.  **Set the text prompt**: Modify the `condition` variable to your desired text prompt.
+3.  **Run the script**:
+    ```bash
+    python sample_diffusion.py
+    ```
+This will generate and save two images: one using standard DDPM sampling (`generated_image_pokemon.png`) and another using Classifier-Free Guidance (`generated_image_pokemon_cfg.png`).
 
-#### 训练Epoch过程中的样本图片生成：
+## Key Features
 
-随着训练epoch过程，生成（带文字条件）的图片会越来越清晰。
+-   **Text-Conditioned Generation**: The model can generate images based on descriptive text prompts.
+-   **Modern U-Net Architecture**: Implements a U-Net with ResNet blocks and self-attention, similar to those used in state-of-the-art models.
+-   **Cross-Attention Mechanism**: Utilizes a `SpatialTransformer` to effectively inject the text conditioning into the U-Net, enabling fine-grained control over the generated image.
+-   **Classifier-Free Guidance (CFG)**: The sampling script includes an implementation of CFG, a technique that improves the quality and relevance of conditional image generation.
+-   **Training Monitoring**: Integrated with Weights & Biases for real-time tracking of losses, learning rates, and generated image samples.
 
-> `文本条件 = "a water type pokemon"`
+## Learning Objectives
 
-![img](diffusion_results/img.png)
-
-> `文本条件 = "a dragon character with tail"`
-
-![img](diffusion_results/img_1.png)
-
-#### 训练完成后模型生成：
-
-模型训练完成后，运行 `sample_diffusion.py` 可以生成一些图片。
-
-> 1. `文本条件 = "a cartoon pikachu with big eyes and big ears"`
-- 普通DDPM采样生成：
-
-![img](diffusion_results/img_3.png)
-
-- Classifier-Free Guidance(CFG) 采样：
-
-![img](diffusion_results/img_4.png)
-
-> 2. `文本条件 = "a red pokemon with a red fire tail"`
-
-- 普通DDPM采样生成：
-
-![img](diffusion_results/img_5.png)
-
-- Classifier-Free Guidance(CFG) 采样生成：
-
-![img](diffusion_results/img_6.png)
-
-> 3. `文本条件 = "a green bird with a red tail and a black nose"`
-
-- 普通DDPM采样生成：
-
-![img](diffusion_results/img_7.png)
-
-- Classifier-Free Guidance(CFG) 采样生成：
-
-所有的CFG采样生成的图片都比较暗是由于对数据集进行了数据增强处理，导致了图片的亮度变化。而在训练过程中，模型学习到了这种亮度变化，所以生成的图片也会有这种特点。
-
-![img](diffusion_results/img_8.png)
-
-
-#### 关于损失值：
-
-使用了均方误差损失函数。
-
-训练图片被缩放成了64x64的尺寸，所以损失值是按照像素计算的。
-
-由于这个例子中的pokemon数据集相对较小，300个epoch和2000个epoch的结果差不多。要想达到更完美的生成效果，个人能力认为智能增加更多pokemon训练集图片数量。因为加入文本嵌入条件之后做到生成的泛化，800张图片是远远不够的（参考SD2的训练集数量是1亿张以上）。
-
-- Learning rate 及 训练损失：
-![train loss](diffusion_results/img_0.png)
-
-
-#### 效果说明：
-
-Diffusion这里想说的东西太多了，基本都在视频里讲了一遍。
-
-由于这个实现是增加了“文本条件”的，所以简单的模型架构和少量的训练集无法达到很好的泛化效果。
-
-- 如果只是使用DDPM模型来实现训练集上见过的图片浮现是很容易的；
-
-- 又或者做照片分类任务DDPM也较容易。
-
-但以上这两方面网上开源的实现已经很多了。
-
-加入文本条件的生成模型则教学很少。在代码的实现中增加了Attention机制，跳跃链接等，这样才能更好的利用文本信息以结合图片像素关系。
-
-这个实现只是一个简单的示例，希望能给大家一些启发。
+-   Understand the architecture of a text-conditioned diffusion model.
+-   Learn how a U-Net can be modified with attention mechanisms for conditional generation.
+-   See how text embeddings from models like CLIP are used to guide the image synthesis process.
+-   Gain insight into the training and sampling loops of a diffusion model, including the role of the noise scheduler and Classifier-Free Guidance.

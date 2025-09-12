@@ -1,182 +1,78 @@
----
-noteId: "c1d1abf08ef911f0a16d2d94aac5ab6c"
-tags: []
+# LeNet-5 From Scratch (Extended Version)
 
----
+This project provides an enhanced, from-scratch implementation of the LeNet-5 architecture using PyTorch. It builds upon the classic model by incorporating modern deep learning practices and a more complete project structure, including training, custom test generation, and inference pipelines.
 
-# LeNet5 From Scratch (Extended Version)
-
-This is an enhanced implementation of LeNet-5 with modern improvements and comprehensive utilities. Unlike the basic LeNet implementation, this version includes advanced training features, visualization tools, and inference capabilities.
+This implementation is designed to be a comprehensive, educational example of a full image classification workflow.
 
 ## Architecture
 
-Enhanced LeNet-5 with modern improvements:
-- **Input Layer**: 32×32 grayscale images (MNIST)
-- **Conv Layer 1**: 6 feature maps, 5×5 kernel + ReLU + MaxPool
-- **Conv Layer 2**: 16 feature maps, 5×5 kernel + ReLU + MaxPool  
-- **Fully Connected**: 16×6×6 → 120 → 84 → 10 classes
-- **Improvements**: Better weight initialization, modern activation functions
+This implementation uses a modernized version of the LeNet-5 architecture.
 
-## Files
+-   **Input**: 32×32 grayscale images.
+-   **Convolutional Blocks**: Two blocks of `Conv2d` -> `ReLU` -> `MaxPool2d` for feature extraction.
+-   **Fully Connected Layers**: Three `Linear` layers with `ReLU` activations for classification.
+-   **Modern Practices**:
+    -   Uses `ReLU` activation instead of the original `tanh`.
+    -   Uses `MaxPool2d` instead of average pooling.
+    -   Employs the `Adam` optimizer for more efficient training.
 
-- `model.py` - Enhanced LeNet5 model with modern improvements
-- `train.py` - Advanced training script with visualization and monitoring
-- `inference.py` - Comprehensive inference pipeline with testing utilities
-- `generate_test_digits.py` - Custom test digit generation for evaluation
+## File Structure
+
+-   `model.py`: Contains the implementation of the LeNet-5 model architecture.
+-   `train.py`: The main training script. It handles data loading, training, evaluation, and plots the training loss and test accuracy curves.
+-   `generate_test_digits.py`: A utility script to generate custom test images of digits (0-9) using the PIL library.
+-   `inference.py`: A script to run inference on the generated test digits or any other image using the trained model.
+-   `data/`: Directory where the MNIST dataset is stored.
+-   `test_digits/`: Directory where the generated test images are saved.
+-   `README.md`: This documentation file.
 
 ## Usage
 
-### 1. Training the Model
-```bash
-python train.py
-```
+The project is designed to be run in a sequence: generate test data, train the model, and then run inference.
 
-**Features:**
-- Automatic MNIST dataset download and preprocessing
-- Training progress visualization with loss and accuracy plots
-- Model checkpointing with best weights saving
-- Support for MPS (Apple Silicon), CUDA, and CPU
-- Real-time training monitoring
-
-**Outputs:**
-- `lenet5_model.pth` - Trained model weights
-- `training_results.png` - Training curves visualization
-
-### 2. Generating Test Data
-```bash
-python generate_test_digits.py
-```
-
-**Features:**
-- Creates custom test digits (0-9) using PIL
-- Generates images in `test_digits/` directory
-- Configurable image size and styling
-- Font-based digit rendering for testing
-
-### 3. Running Inference
-```bash
-python inference.py
-```
-
-**Features:**
-- Tests model on generated digits
-- Batch evaluation of all test images
-- Detailed prediction results with confidence
-- Visual feedback with checkmarks/crosses
-
-## Key Improvements Over Basic LeNet
-
-### Training Enhancements:
-- **Modern Optimizers**: Adam optimizer with better convergence
-- **Improved Initialization**: Xavier/He initialization for faster training
-- **Learning Rate Scheduling**: Adaptive learning rate adjustments
-- **Progress Monitoring**: Real-time loss and accuracy tracking
-- **Visualization**: Training curves and results plotting
-
-### Inference Pipeline:
-- **Custom Test Generation**: Create your own test cases
-- **Batch Processing**: Evaluate multiple images efficiently  
-- **Confidence Scoring**: Get prediction probabilities
-- **Error Analysis**: Visual feedback on correct/incorrect predictions
-
-### Code Quality:
-- **Modular Design**: Separate files for different functionalities
-- **Comprehensive Logging**: Detailed training information
-- **Error Handling**: Robust file operations and error checking
-- **Documentation**: Clear code comments and docstrings
-
-## Expected Results
-
-- **Training Accuracy**: >99%
-- **Test Accuracy**: >98%
-- **Training Time**: 1-2 minutes (GPU), 3-5 minutes (CPU)
-- **Generated Test Accuracy**: ~90-95% (depends on font rendering)
-
-## Generated Files
-
-After running the complete pipeline:
-```
-lenet5_from_scratch/
-├── model.py
-├── train.py  
-├── inference.py
-├── generate_test_digits.py
-├── lenet5_model.pth          # Trained weights
-├── training_results.png      # Training visualization
-└── test_digits/              # Generated test images
-    ├── digit_0.png
-    ├── digit_1.png
-    └── ... (digit_9.png)
-```
-
-## Learning Objectives
-
-This enhanced implementation teaches:
-
-### Deep Learning Concepts:
-- CNN architecture design and layer composition
-- Training loop implementation with proper monitoring
-- Model evaluation and validation techniques
-- Hyperparameter tuning and optimization strategies
-
-### Software Engineering:
-- Project organization and modular code design
-- File I/O operations and data management
-- Visualization and result presentation
-- Testing and validation pipelines
-
-### Computer Vision:
-- Image preprocessing and normalization
-- Data augmentation techniques
-- Custom dataset creation and evaluation
-- Performance analysis and model interpretation
-
-## Requirements
-
+### 1. Prerequisites
+Install the required Python libraries:
 ```bash
 pip install torch torchvision matplotlib pillow numpy
 ```
 
-## Advanced Features
+### 2. Generate Custom Test Data (Optional)
+You can create your own simple test images of digits 0-9 by running:
+```bash
+python generate_test_digits.py
+```
+This will create a `test_digits/` directory and save a `digit_N.png` image for each digit `N`.
 
-### Custom Dataset Testing
-The `generate_test_digits.py` creates synthetic digits using different fonts and styles, allowing you to:
-- Test model robustness on different digit styles
-- Evaluate generalization beyond MNIST training data
-- Create custom evaluation scenarios
-- Debug model predictions on edge cases
+### 3. Training the Model
+To train the model on the MNIST dataset, run:
+```bash
+python train.py
+```
+This script will:
+-   Automatically download the MNIST dataset.
+-   Train the LeNet-5 model for 10 epochs.
+-   Print the loss and accuracy for each epoch.
+-   Save the trained model weights to `lenet5_model.pth`.
+-   Save a plot of the training curves to `training_results.png`.
 
-### Visualization and Monitoring
-The training script provides:
-- Real-time loss and accuracy curves
-- Training progress with epoch-by-epoch results
-- Saved plots for later analysis
-- Performance comparison across training runs
+### 4. Running Inference
+After training, you can test the model's performance on the custom-generated digits:
+```bash
+python inference.py
+```
+This will load the trained `lenet5_model.pth` and print the model's prediction for each of the generated digit images, indicating whether the prediction was correct.
 
-### Production-Ready Inference
-The inference pipeline includes:
-- Batch processing capabilities
-- Confidence scoring for predictions
-- Error analysis and debugging tools
-- Easy integration with other applications
+## Key Features
 
-## Next Steps
+-   **Complete Workflow**: Provides a full, end-to-end example from training to inference.
+-   **Training Visualization**: Automatically generates and saves plots for training loss and test accuracy, which is crucial for monitoring model performance.
+-   **Modern Optimizer**: Uses the `Adam` optimizer, which generally leads to faster convergence than traditional SGD.
+-   **Custom Test Set Generation**: Includes a script to create a synthetic test set, allowing for simple, intuitive model validation.
+-   **Modular and Clear Code**: The logic is separated into distinct files for the model, training, and inference, making the code easy to understand and extend.
 
-This implementation serves as a foundation for:
-- **Experimenting with architectures**: Modify layers and observe effects
-- **Advanced techniques**: Add batch normalization, dropout, data augmentation
-- **Transfer learning**: Use pre-trained features for new tasks
-- **Model optimization**: Quantization, pruning, and deployment techniques
+## Learning Objectives
 
-## Comparison with Other Implementations
-
-| Feature | Basic LeNet | LeNet5 Extended | Modern CNNs |
-|---------|-------------|-----------------|-------------|
-| Training Visualization | ❌ | ✅ | ✅ |
-| Custom Test Generation | ❌ | ✅ | ✅ |
-| Inference Pipeline | ❌ | ✅ | ✅ |
-| Model Checkpointing | ❌ | ✅ | ✅ |
-| Batch Processing | ❌ | ✅ | ✅ |
-| Performance Monitoring | ❌ | ✅ | ✅ |
-
-This extended version bridges the gap between educational implementations and production-ready deep learning systems.
+-   Understand how to structure a deep learning project with separate scripts for different tasks.
+-   Learn to implement a full training pipeline that includes performance monitoring and visualization.
+-   See how to save and load a trained model for inference.
+-   Gain experience with a simple computer vision pipeline, from data preparation to model evaluation on custom images.

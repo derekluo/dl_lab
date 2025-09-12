@@ -1,112 +1,90 @@
 # GPT-2 From Scratch
 
-A from-scratch implementation of the GPT-2 architecture for language modeling and text generation.
+This project is a from-scratch implementation of a GPT-2 style transformer model for character-level language modeling and text generation. The model is built using PyTorch and is designed for educational purposes to demonstrate the core components of the GPT architecture.
 
-## Project Structure
+## Architecture
 
-.
-├── bin/
-│   ├── concatenate.sh    # Data concatenation utility
-│   └── download.py       # Data download script
-├── data/                 # Training data directory
-├── train.py             # Training script
-├── inference.py         # Inference script
-└── show_params.py       # Parameter visualization tool
+The model is a decoder-only transformer, following the principles of the GPT-2 architecture.
 
-## Dataset
+-   **Token and Positional Embeddings**: The model uses a token embedding table to convert input characters into vectors and adds sinusoidal positional encodings to provide sequence information.
+-   **Transformer Blocks**: The core of the model is a stack of `TransformerBlock` modules. Each block consists of:
+    -   **Multi-Head Self-Attention**: A causal self-attention mechanism with multiple heads to allow the model to weigh the importance of different characters in the context. The causal mask ensures that predictions for a position can only depend on the preceding characters.
+    -   **Feed-Forward Network**: A two-layer feed-forward network applied after the attention mechanism.
+    -   **Residual Connections and Layer Normalization**: Both the attention and feed-forward sub-layers include residual connections and are preceded by layer normalization for stable training.
+-   **Output Layer**: A final linear layer projects the output of the transformer blocks to the vocabulary size to produce logits for the next character prediction.
 
-The project uses a science fiction text dataset (`data/scifi.txt`) for training the language model. The dataset:
+## File Structure
 
-- Contains curated science fiction literature and stories
-- Is preprocessed and tokenized for training
-- Follows a specific format for model consumption
-- Is automatically downloaded using the provided scripts
-
-1. https://huggingface.co/datasets/wzy816/scifi
-2. https://huggingface.co/datasets/zxbsmk/webnovel_cn
-
-
-### Data Format
-
-The text data is structured as:
-- Plain text format (.txt)
-- UTF-8 encoded
-- One story/document per line
-- Cleaned and normalized text
-
-### Data Preparation
-
-The data preparation pipeline:
-1. Downloads raw text files using `bin/download.py`
-2. Concatenates multiple sources using `bin/concatenate.sh`
-3. Performs preprocessing and cleaning
-4. Creates training-ready dataset
-
-## Setup
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/LLM-Lab.git
-cd LLM-Lab
-```
-
-2. Create and activate a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+-   `model.py`: Contains the complete implementation of the GPT-2 style model, including all sub-modules like `Attention`, `MultiHeadAttention`, and `TransformerBlock`.
+-   `train.py`: The main training script. It handles data loading, model initialization, the training loop, and loss estimation. It also integrates with `aim` for experiment tracking.
+-   `inference.py`: A script for generating new text from a trained model given a starting prompt.
+-   `show_params.py`: A utility script to display the names, shapes, and total number of parameters in the trained model.
+-   `bin/`: Contains helper scripts for data preparation.
+    -   `download.py`: Downloads the training dataset.
+    -   `concatenate.sh`: Concatenates multiple data files into one.
+-   `data/`: Directory where the training data is stored.
+-   `models/`: Directory where the trained model weights are saved.
+-   `README.md`: This documentation file.
 
 ## Usage
 
-### Data Preparation
-
-1. Download the training data:
+### 1. Prerequisites
+Install the required Python libraries. `aim` is used for experiment tracking.
 ```bash
-python bin/download.py
+pip install torch aim
 ```
 
-2. Concatenate data files:
+### 2. Data Preparation
+First, download and prepare the training data using the provided scripts.
 ```bash
+# Download the dataset
+python bin/download.py
+
+# Concatenate the data files into a single file
 bash bin/concatenate.sh
 ```
+This will create a `scifi.txt` file in the `data/` directory.
 
-### Training
-
-To train the model:
-
+### 3. Training the Model
+To start training the model, run the training script:
 ```bash
 python train.py
 ```
+The script will:
+-   Load the `scifi.txt` dataset.
+-   Initialize the model, optimizer, and experiment tracking with `aim`.
+-   Run the training loop, periodically printing the training and validation loss.
+-   Save the final trained model to `models/model-scifi.pth`.
 
-### Inference
+To visualize the training metrics, run the `aim` UI in a separate terminal:
+```bash
+aim up
+```
 
-To run inference with a trained model:
-
+### 4. Generating Text
+Once the model is trained, you can generate new text using the `inference.py` script.
 ```bash
 python inference.py
 ```
+This will load the trained model and generate a 500-token completion for a hardcoded prompt. You can modify the `prompt` variable in the script to provide your own starting text.
 
-### Model Analysis
-
-To visualize model parameters:
-
+### 5. Inspecting the Model
+To see the details of the model's parameters, you can run:
 ```bash
 python show_params.py
 ```
+This will list all the parameter tensors in the model and their shapes, along with the total parameter count.
 
-## Contributing
+## Key Features
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+-   **Pure PyTorch Implementation**: The model is built from scratch using fundamental PyTorch modules.
+-   **Character-Level Model**: The model operates on individual characters, making the vocabulary small and the tokenization process simple.
+-   **Causal Self-Attention**: Implements a masked multi-head self-attention mechanism, which is the core of autoregressive transformer models.
+-   **Experiment Tracking**: Integrated with `aim` to log and visualize training and validation losses.
 
-## License
+## Learning Objectives
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+-   Understand the architecture of a decoder-only transformer like GPT-2.
+-   Learn how to implement causal multi-head self-attention from scratch.
+-   See how token and positional embeddings are combined in a transformer.
+-   Gain insight into a standard training and generation pipeline for an autoregressive language model.

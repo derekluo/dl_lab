@@ -1,127 +1,71 @@
----
-noteId: "a98f58308ef911f0a16d2d94aac5ab6c"
-tags: []
-
----
-
 # AlexNet From Scratch
 
-This project implements the revolutionary AlexNet convolutional neural network architecture from scratch using PyTorch. AlexNet won the 2012 ImageNet Large Scale Visual Recognition Challenge (ILSVRC) and sparked the deep learning revolution in computer vision.
+This project provides a from-scratch implementation of the AlexNet convolutional neural network (CNN) architecture using PyTorch. AlexNet was a groundbreaking model that won the 2012 ImageNet Large Scale Visual Recognition Challenge (ILSVRC) and is considered a major catalyst for the deep learning revolution in computer vision.
+
+This implementation is intended for educational purposes to demonstrate the core components and structure of AlexNet.
 
 ## Architecture
 
-AlexNet consists of:
-- **Input Layer**: 224×224×3 RGB images
-- **5 Convolutional Layers** with ReLU activations and max pooling
-- **3 Fully Connected Layers** with dropout for regularization
-- **Output Layer**: 1000 classes (ImageNet) or configurable for other datasets
+The AlexNet architecture consists of five convolutional layers followed by three fully connected layers.
+
+-   **Input**: 227×227×3 RGB images.
+-   **5 Convolutional Layers**: Feature extraction using stacked convolutional filters, ReLU activations, and max pooling.
+-   **3 Fully Connected Layers**: Classification layers that process the extracted features, with dropout for regularization.
+-   **Output Layer**: A final layer with a configurable number of classes (defaulting to 1000 for ImageNet).
 
 ### Layer Details:
-1. **Conv1**: 96 kernels (11×11×3), stride 4, followed by ReLU and max pooling
-2. **Conv2**: 256 kernels (5×5×96), stride 1, followed by ReLU and max pooling
-3. **Conv3**: 384 kernels (3×3×256), stride 1, followed by ReLU
-4. **Conv4**: 384 kernels (3×3×384), stride 1, followed by ReLU
-5. **Conv5**: 256 kernels (3×3×384), stride 1, followed by ReLU and max pooling
-6. **FC1**: 4096 neurons with ReLU and dropout
-7. **FC2**: 4096 neurons with ReLU and dropout
-8. **FC3**: Output layer (num_classes neurons)
+1.  **Conv1**: 96 kernels (11×11), stride 4 → ReLU → MaxPool
+2.  **Conv2**: 256 kernels (5×5), stride 1 → ReLU → MaxPool
+3.  **Conv3**: 384 kernels (3×3), stride 1 → ReLU
+4.  **Conv4**: 384 kernels (3×3), stride 1 → ReLU
+5.  **Conv5**: 256 kernels (3×3), stride 1 → ReLU → MaxPool
+6.  **FC1**: 4096 neurons → ReLU → Dropout
+7.  **FC2**: 4096 neurons → ReLU → Dropout
+8.  **FC3**: Output layer (num_classes neurons)
 
-## Files
+## File Structure
 
-- `alexnet.py` - Complete AlexNet model implementation
-- `train.py` - Training script with ImageNet-style preprocessing
-- `inference.py` - Inference utilities with top-k predictions
+-   `alexnet.py`: Contains the complete implementation of the AlexNet model architecture.
+-   `train.py`: A script for training the AlexNet model. It includes data loading, preprocessing, and the main training loop.
+-   `inference.py`: A script for running inference on new images using a trained AlexNet model. It provides top-k predictions.
+-   `README.md`: This documentation file.
 
 ## Usage
 
-### Training the Model
-```bash
-python train.py
-```
-
-Features:
-- ImageNet-style data preprocessing and augmentation
-- SGD optimizer with momentum
-- Learning rate scheduling
-- GPU acceleration support
-- Training progress monitoring
-
-### Running Inference
-```bash
-python inference.py
-```
-
-Features:
-- Single image classification
-- Top-k predictions with confidence scores
-- Support for custom class labels
-- Batch inference capabilities
-
-## Key Innovations of AlexNet
-
-1. **ReLU Activation**: First major CNN to use ReLU instead of tanh/sigmoid
-2. **GPU Implementation**: Pioneered GPU training for deep networks
-3. **Dropout**: Used dropout in fully connected layers to prevent overfitting
-4. **Data Augmentation**: Extensive use of image transformations
-5. **Local Response Normalization**: Early form of normalization (now replaced by batch norm)
-
-## Implementation Features
-
-- **Pure PyTorch**: No pre-built models, implemented from scratch
-- **Flexible Architecture**: Configurable number of output classes
-- **GPU Support**: CUDA and MPS (Apple Silicon) acceleration
-- **Modern Training**: Includes techniques like learning rate scheduling
-- **Inference Tools**: Top-k prediction and confidence scoring
-
-## Expected Performance
-
-On ImageNet (original dataset):
-- **Top-1 Accuracy**: ~57.1%
-- **Top-5 Accuracy**: ~80.2%
-
-Note: Performance may vary based on training setup and hyperparameters.
-
-## Learning Objectives
-
-This implementation demonstrates:
-- Deep convolutional neural network architecture design
-- The importance of ReLU activations in deep networks
-- Dropout regularization techniques
-- GPU-accelerated training workflows
-- Image classification pipeline from preprocessing to inference
-
-## Requirements
-
+### 1. Prerequisites
+Install the required Python libraries:
 ```bash
 pip install torch torchvision pillow numpy matplotlib
 ```
 
-## Historical Impact
+### 2. Training the Model
+The `train.py` script is set up to train the model on a dataset structured like the ImageNet dataset. You will need to provide your own dataset and update the path in the script.
 
-AlexNet's victory in ImageNet 2012 was significant because:
-- It demonstrated the power of deep learning for computer vision
-- It showed that CNNs could outperform traditional computer vision methods
-- It sparked the "deep learning revolution" in AI research
-- It established many practices still used in modern deep learning
+To start training:
+```bash
+python train.py
+```
+This will train the model and save the learned weights to a file named `alexnet_model.pth`.
 
-## Architecture Comparison
+### 3. Running Inference
+Once the model is trained, you can use `inference.py` to classify a new image.
 
-| Aspect | LeNet-5 (1998) | AlexNet (2012) |
-|--------|----------------|----------------|
-| Layers | 7 | 8 |
-| Parameters | ~60K | ~60M |
-| Input Size | 32×32 | 224×224 |
-| Activation | tanh | ReLU |
-| Dataset | MNIST | ImageNet |
-| GPU Training | No | Yes |
+Update the `model_path` and `image_path` variables in the script, then run:
+```bash
+python inference.py
+```
+The script will load the trained model, process the image, and print the top-5 predicted classes along with their confidence scores.
 
-## Modern Improvements
+## Key Features
 
-While AlexNet was groundbreaking, modern CNNs include:
-- **Batch Normalization**: Replaces Local Response Normalization
-- **Skip Connections**: As in ResNet architectures
-- **Attention Mechanisms**: For better feature selection
-- **Efficient Architectures**: Like MobileNet and EfficientNet
-- **Transfer Learning**: Pre-trained models for quick adaptation
+-   **Pure PyTorch Implementation**: The model is built from scratch using fundamental PyTorch modules, without relying on pre-built models.
+-   **Configurable Architecture**: The number of output classes can be easily configured to adapt the model to different datasets.
+-   **GPU Acceleration**: The code automatically leverages a CUDA-enabled GPU or Apple Silicon (MPS) if available, falling back to the CPU otherwise.
+-   **Standard Preprocessing**: Implements the standard ImageNet-style preprocessing (resizing, cropping, and normalization).
 
-This implementation serves as an excellent bridge between simple CNNs (LeNet) and modern architectures (ResNet, Vision Transformers).
+## Learning Objectives
+
+-   Understand the architecture of a deep convolutional neural network.
+-   Learn how to implement a classic CNN model in PyTorch.
+-   See how key components like ReLU, MaxPooling, and Dropout are used in practice.
+-   Gain insight into a standard training and inference pipeline for image classification.

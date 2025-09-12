@@ -1,196 +1,74 @@
 # Transformer From Scratch
 
-本项目展示了如何从零开始实现基本的 Transformer 模型，用于文本分类任务。
+This project provides a from-scratch implementation of a Transformer-based text classifier using PyTorch. The model is designed for educational purposes to demonstrate the core components of the Transformer architecture as described in the paper "Attention Is All You Need."
 
-## 项目结构
+The project includes a complete workflow: generating synthetic training data, building a vocabulary, training the model, and running inference on new text.
 
-- `model.py` - Transformer 模型实现，包含所有核心组件
-- `train.py` - 训练脚本，生成训练结果图表
-- `inference.py` - 推理脚本，用于测试训练好的模型
-- `generate_test_texts.py` - 生成测试文本数据的脚本
-- `.gitignore` - Git 忽略文件配置
-- `README.md` - 项目说明文档
+## Architecture
 
-## 快速开始
+The model is based on the encoder part of the original Transformer architecture.
 
-### 1. 安装依赖
+-   **Embedding and Positional Encoding**: Input tokens are converted into embeddings, which are then combined with sinusoidal positional encodings to provide the model with information about the sequence order.
+-   **Transformer Blocks**: The core of the model is a stack of `TransformerBlock` modules. Each block consists of:
+    -   **Multi-Head Self-Attention**: Allows the model to weigh the importance of different words in the input text when encoding a specific word.
+    -   **Feed-Forward Network**: A two-layer feed-forward network applied after the attention mechanism.
+    -   **Residual Connections and Layer Normalization**: Both sub-layers (attention and feed-forward) include residual connections and are followed by layer normalization for stable and effective training.
+-   **Classification Head**: The output from the transformer blocks is averaged across the sequence length and then passed through a final linear layer to produce classification scores for the different text categories.
+
+## File Structure
+
+-   `model.py`: Contains the complete implementation of the Transformer architecture, including `MultiHeadAttention`, `PositionalEncoding`, and `TransformerBlock`.
+-   `train.py`: The main training script. It handles the creation of synthetic data, vocabulary building, training, evaluation, and plotting of results.
+-   `inference.py`: A script for loading a trained model and running inference on new text, with an interactive mode.
+-   `generate_test_texts.py`: A utility to generate a more diverse set of test sentences for each category, which can be used for more robust evaluation.
+-   `test_texts/`: Directory where the generated test texts are saved.
+-   `README.md`: This documentation file.
+
+## Usage
+
+### 1. Prerequisites
+Install the required Python libraries:
 ```bash
-pip install torch torchvision numpy scikit-learn matplotlib
+pip install torch scikit-learn matplotlib numpy
 ```
 
-### 2. 训练模型
+### 2. Training the Model
+To train the model, run the training script:
 ```bash
 python train.py
 ```
-训练完成后会生成：
-- `transformer_model.pth` - 训练好的模型文件
-- `training_results.png` - 训练过程可视化图表
+This script will:
+-   Generate a synthetic dataset for 5 text categories (Technology, Sports, Science, Music, Food).
+-   Build a vocabulary from the training data.
+-   Train the Transformer model for 15 epochs.
+-   Print the loss and accuracy for each epoch.
+-   Save the trained model, vocabulary, and configuration to `transformer_model.pth`.
+-   Save a plot of the training curves to `training_results.png`.
 
-### 3. 生成测试数据
-```bash
-python generate_test_texts.py
-```
-会在 `test_texts/` 目录下生成各类别的测试文本。
-
-### 4. 测试模型
+### 3. Running Inference
+After training, you can classify new text using the `inference.py` script:
 ```bash
 python inference.py
 ```
-测试预定义样本并进入交互模式。
+The script will first run on a set of predefined sample sentences and then enter an interactive mode where you can input your own text to be classified.
 
-## 模型架构
-
-### 核心组件
-
-1. **MultiHeadAttention** - 多头注意力机制
-   - 实现缩放点积注意力
-   - 支持多头并行计算
-   - 包含线性投影层
-
-2. **PositionalEncoding** - 位置编码
-   - 使用正弦和余弦函数
-   - 为序列提供位置信息
-
-3. **TransformerBlock** - Transformer 块  
-   - 多头注意力 + 前馈网络
-   - 残差连接和层归一化
-   - 支持掩码机制
-
-4. **SimpleTransformer** - 完整模型
-   - 词嵌入层和位置编码
-   - 多个 Transformer 块
-   - 文本分类头
-
-### 默认参数
-- 词汇表大小: 5,000
-- 模型维度: 128
-- 注意力头数: 4  
-- Transformer 层数: 2
-- 分类类别: 5 (技术、体育、科学、音乐、食物)
-- 最大序列长度: 64
-
-## 数据集
-
-训练使用合成的文本数据，包含5个类别：
-
-1. **Technology** - 计算机、编程、AI等相关内容
-2. **Sports** - 体育运动、比赛、运动员等
-3. **Science** - 科学研究、实验、理论等  
-4. **Music** - 音乐、乐器、演出等
-5. **Food** - 食物、烹饪、餐厅等
-
-## 文件说明
-
-### model.py
-包含完整的 Transformer 实现：
-- `MultiHeadAttention`: 多头注意力机制
-- `PositionalEncoding`: 位置编码
-- `FeedForward`: 前馈网络
-- `TransformerBlock`: Transformer 块
-- `Transformer`: 完整模型
-- `SimpleTransformer`: 简化接口
-
-### train.py  
-训练脚本功能：
-- 生成合成训练数据
-- 构建词汇表
-- 训练模型并保存
-- 生成训练过程图表
-- 支持 CPU/GPU/MPS 加速
-
-### inference.py
-推理脚本功能：  
-- 加载训练好的模型
-- 对新文本进行分类
-- 预定义样本测试
-- 交互式文本分类
-
-### generate_test_texts.py
-测试数据生成器：
-- 为每个类别生成丰富的测试文本
-- 使用模板和随机组合
-- 保存为多种格式（TXT/JSON）
-- 创建带标签的混合测试集
-
-## 使用示例
-
-### 训练自定义数据
-```python
-from model import SimpleTransformer
-import torch
-
-# 自定义模型配置
-model = SimpleTransformer(
-    vocab_size=10000,
-    d_model=256,
-    n_heads=8,
-    n_layers=4,
-    num_classes=3,
-    max_length=128
-)
+### 4. Generating a Test Set (Optional)
+For more thorough testing, you can generate a richer set of test sentences:
+```bash
+python generate_test_texts.py
 ```
+This will create several files in the `test_texts/` directory, including a `mixed_test_set.json` file that can be used for a more formal evaluation.
 
-### 单个文本预测
-```python
-from inference import predict_text, get_class_name
+## Key Features
 
-text = "This machine learning algorithm improves performance"
-class_id, confidence = predict_text(text)
-print(f"预测类别: {get_class_name(class_id)}, 置信度: {confidence:.2%}")
-```
+-   **Pure PyTorch Implementation**: The model is built from scratch using fundamental PyTorch modules, providing a clear view of the inner workings of a Transformer.
+-   **Self-Contained Project**: Includes scripts for data generation, training, and inference, making it a complete, runnable example.
+-   **Clear Component-Based Architecture**: The code is organized into logical components (`MultiHeadAttention`, `TransformerBlock`, etc.), making it easy to understand the different parts of the model.
+-   **Training Visualization**: Automatically generates plots for training loss and test accuracy to help monitor the training process.
 
-## 训练结果
+## Learning Objectives
 
-训练脚本会自动生成 `training_results.png`，包含：
-- 训练损失曲线
-- 测试准确率曲线
-
-典型性能：
-- 训练准确率: >95%
-- 测试准确率: >90%
-- 训练时间: 2-5分钟 (CPU)
-
-## 扩展建议
-
-1. **数据集**
-   - 使用真实文本数据集 (IMDB, AG News等)
-   - 添加数据增强技术
-   - 支持多语言文本
-
-2. **模型优化**  
-   - 增加模型层数和维度
-   - 实现学习率调度
-   - 添加权重衰减和dropout
-
-3. **功能扩展**
-   - 序列到序列任务
-   - 预训练和微调
-   - 注意力可视化
-
-## 注意事项
-
-- 这是一个教学用的简化实现，展示 Transformer 核心原理
-- 生产环境建议使用 Hugging Face Transformers 库  
-- 模型相对较小，适合在 CPU 上快速演示
-- 合成数据主要用于概念验证，实际应用需要真实数据
-
-## 技术细节
-
-### 注意力机制
-```
-Attention(Q,K,V) = softmax(QK^T/√d_k)V
-```
-
-### 位置编码
-```
-PE(pos,2i) = sin(pos/10000^(2i/d_model))
-PE(pos,2i+1) = cos(pos/10000^(2i/d_model))
-```
-
-### 层归一化
-在每个子层后应用，有助于训练稳定性。
-
-### 残差连接
-```
-output = LayerNorm(x + Sublayer(x))
-```
+-   Understand the architecture of a Transformer encoder.
+-   Learn how to implement multi-head self-attention and positional encoding from scratch.
+-   See how to build a complete text classification pipeline using a Transformer model.
+-   Gain insight into the process of creating a vocabulary, tokenizing text, and preparing data for an NLP model.
