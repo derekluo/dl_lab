@@ -1,16 +1,28 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
-from sklearn.model_selection import train_test_split
-from collections import Counter
+import matplotlib.pyplot as plt
 import numpy as np
 import re
-import matplotlib.pyplot as plt
+from collections import Counter
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, Dataset
+
 from model import SimpleTransformer
 
+
+def get_device():
+    """Get the best available device"""
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
+    else:
+        return torch.device("cpu")
+
 class TextDataset(Dataset):
-    """Simple text dataset for demonstration"""
+    """Simple text dataset for classification"""
+    
     def __init__(self, texts, labels, vocab, max_length=128):
         self.texts = texts
         self.labels = labels
@@ -23,44 +35,31 @@ class TextDataset(Dataset):
     def __getitem__(self, idx):
         text = self.texts[idx]
         label = self.labels[idx]
-
-        # Simple tokenization and encoding
-        tokens = self.tokenize(text)
-        encoded = self.encode_tokens(tokens)
-
+        encoded = self._encode_text(text)
         return torch.tensor(encoded, dtype=torch.long), torch.tensor(label, dtype=torch.long)
 
-    def tokenize(self, text):
-        # Simple tokenization: lowercase and split on whitespace/punctuation
-        text = text.lower()
-        text = re.sub(r'[^\w\s]', ' ', text)
-        tokens = text.split()
-        return tokens[:self.max_length]
-
-    def encode_tokens(self, tokens):
-        # Encode tokens to indices, pad to max_length
+    def _encode_text(self, text):
+        # Tokenize and encode
+        text = re.sub(r'[^\w\s]', ' ', text.lower())
+        tokens = text.split()[:self.max_length]
+        
         encoded = [self.vocab.get(token, self.vocab['<UNK>']) for token in tokens]
-
-        # Pad or truncate to max_length
+        
+        # Pad to max_length
         if len(encoded) < self.max_length:
             encoded.extend([self.vocab['<PAD>']] * (self.max_length - len(encoded)))
-        else:
-            encoded = encoded[:self.max_length]
-
+        
         return encoded
 
 def build_vocab(texts, min_freq=2, max_vocab_size=5000):
     """Build vocabulary from texts"""
     word_counts = Counter()
     for text in texts:
-        text = text.lower()
-        text = re.sub(r'[^\w\s]', ' ', text)
-        tokens = text.split()
-        word_counts.update(tokens)
+        clean_text = re.sub(r'[^\w\s]', ' ', text.lower())
+        word_counts.update(clean_text.split())
 
     vocab = {'<PAD>': 0, '<UNK>': 1}
-    most_common = word_counts.most_common(max_vocab_size - 2)
-    for word, count in most_common:
+    for word, count in word_counts.most_common(max_vocab_size - 2):
         if count >= min_freq:
             vocab[word] = len(vocab)
 
@@ -90,16 +89,14 @@ def create_sample_data(num_samples=2000, num_classes=5):
 
     return texts, labels
 
-def train_model(num_epochs=15, batch_size=32, learning_rate=0.001):
-    # Set device
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
+def train_model(num_epochs=15, batch_size=32, learning_rate=0.001, max_length=64):
+    device = get_device()
     print(f"Using device: {device}")
 
-    # Create sample data
+    # Create and split data
     print("Creating sample data...")
     texts, labels = create_sample_data(num_samples=2000, num_classes=5)
-
-    # Split data
+    
     train_texts, test_texts, train_labels, test_labels = train_test_split(
         texts, labels, test_size=0.2, random_state=42, stratify=labels
     )
@@ -110,16 +107,17 @@ def train_model(num_epochs=15, batch_size=32, learning_rate=0.001):
     vocab_size = len(vocab)
     num_classes = len(set(labels))
 
-    print(f"Vocabulary size: {vocab_size}")
-    print(f"Number of classes: {num_classes}")
+    print(f"Vocabulary size: {vocab_size:,}")
+    print(f"Classes: {num_classes}")
+    print(f"Train samples: {len(train_texts):,}")
+    print(f"Test samples: {len(test_texts):,}")
 
-    # Create datasets and dataloaders
-    max_length = 64
+    # Create datasets and data loaders
     train_dataset = TextDataset(train_texts, train_labels, vocab, max_length)
     test_dataset = TextDataset(test_texts, test_labels, vocab, max_length)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size, shuffle=False)
 
     # Initialize model
     model = SimpleTransformer(
@@ -131,21 +129,20 @@ def train_model(num_epochs=15, batch_size=32, learning_rate=0.001):
         max_length=max_length
     ).to(device)
 
-    # Loss function and optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    print(f"\nModel has {sum(p.numel() for p in model.parameters()):,} parameters")
+    print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     print("Starting training...\n")
 
-    # Training loop
-    train_losses = []
-    test_accuracies = []
+    # Training
+    train_losses, test_accuracies = [], []
 
     for epoch in range(num_epochs):
+        # Train
         model.train()
-        running_loss = 0.0
-
+        epoch_loss = 0.0
+        
         for data, target in train_loader:
             data, target = data.to(device), target.to(device)
 
@@ -155,31 +152,41 @@ def train_model(num_epochs=15, batch_size=32, learning_rate=0.001):
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item()
+            epoch_loss += loss.item()
 
-        # Calculate average loss for the epoch
-        epoch_loss = running_loss / len(train_loader)
-        train_losses.append(epoch_loss)
+        avg_loss = epoch_loss / len(train_loader)
+        train_losses.append(avg_loss)
 
-        # Evaluate model
-        model.eval()
-        correct = 0
-        total = 0
-
-        with torch.no_grad():
-            for data, target in test_loader:
-                data, target = data.to(device), target.to(device)
-                output = model(data)
-                _, predicted = torch.max(output.data, 1)
-                total += target.size(0)
-                correct += (predicted == target).sum().item()
-
-        accuracy = 100 * correct / total
+        # Evaluate
+        accuracy = _evaluate_model(model, test_loader, device)
         test_accuracies.append(accuracy)
 
-        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}, Accuracy: {accuracy:.2f}%')
+        print(f'Epoch [{epoch+1:2d}/{num_epochs}] Loss: {avg_loss:.4f} | Accuracy: {accuracy:.2f}%')
 
-    # Save the model and vocabulary
+    # Save results
+    _save_results(model, vocab, train_losses, test_accuracies, vocab_size, num_classes, max_length)
+    print(f"\nTraining completed! Final accuracy: {test_accuracies[-1]:.2f}%")
+
+
+def _evaluate_model(model, test_loader, device):
+    """Evaluate model on test set"""
+    model.eval()
+    correct = total = 0
+    
+    with torch.no_grad():
+        for data, target in test_loader:
+            data, target = data.to(device), target.to(device)
+            output = model(data)
+            _, predicted = torch.max(output, 1)
+            total += target.size(0)
+            correct += (predicted == target).sum().item()
+    
+    return 100 * correct / total
+
+
+def _save_results(model, vocab, train_losses, test_accuracies, vocab_size, num_classes, max_length):
+    """Save model and training plots"""
+    # Save model
     torch.save({
         'model_state_dict': model.state_dict(),
         'vocab': vocab,
@@ -193,30 +200,27 @@ def train_model(num_epochs=15, batch_size=32, learning_rate=0.001):
         }
     }, 'transformer_model.pth')
 
-    # Plot training results
-    plt.figure(figsize=(12, 4))
+    # Plot results
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
 
-    plt.subplot(1, 2, 1)
-    plt.plot(train_losses)
-    plt.title('Training Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.grid(True)
+    ax1.plot(train_losses)
+    ax1.set_title('Training Loss')
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Loss')
+    ax1.grid(True, alpha=0.3)
 
-    plt.subplot(1, 2, 2)
-    plt.plot(test_accuracies)
-    plt.title('Test Accuracy')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy (%)')
-    plt.grid(True)
+    ax2.plot(test_accuracies)
+    ax2.set_title('Test Accuracy')
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('Accuracy (%)')
+    ax2.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig('training_results.png', dpi=300, bbox_inches='tight')
+    plt.savefig('training_results.png', dpi=150, bbox_inches='tight')
     plt.close()
 
-    print(f"\nTraining completed. Final accuracy: {test_accuracies[-1]:.2f}%")
     print("Model saved as 'transformer_model.pth'")
-    print("Training results saved as 'training_results.png'")
+    print("Training plots saved as 'training_results.png'")
 
 if __name__ == '__main__':
     train_model()

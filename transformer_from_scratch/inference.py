@@ -1,76 +1,83 @@
 import torch
 import re
+
 from model import SimpleTransformer
 
-def load_model_and_vocab():
-    """Load the trained model and vocabulary"""
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 
-    # Load model checkpoint
-    checkpoint = torch.load('transformer_model.pth', map_location=device)
-    vocab = checkpoint['vocab']
-    model_config = checkpoint['model_config']
+def get_device():
+    """Get the best available device"""
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
+    else:
+        return torch.device("cpu")
 
-    # Initialize model
-    model = SimpleTransformer(
-        vocab_size=model_config['vocab_size'],
-        d_model=model_config['d_model'],
-        n_heads=model_config['n_heads'],
-        n_layers=model_config['n_layers'],
-        num_classes=model_config['num_classes'],
-        max_length=model_config['max_length']
-    ).to(device)
 
-    # Load model weights
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()
-
-    return model, vocab, model_config, device
-
-def tokenize_text(text):
-    """Simple tokenization function"""
-    text = text.lower()
-    text = re.sub(r'[^\w\s]', ' ', text)
-    tokens = text.split()
-    return tokens
-
-def encode_text(text, vocab, max_length):
-    """Encode text to tensor"""
-    tokens = tokenize_text(text)[:max_length]
-    encoded = [vocab.get(token, vocab['<UNK>']) for token in tokens]
-
-    # Pad to max_length
-    if len(encoded) < max_length:
-        encoded.extend([vocab['<PAD>']] * (max_length - len(encoded)))
-
-    return torch.tensor(encoded, dtype=torch.long).unsqueeze(0)
-
-def predict_text(text):
-    """Predict the class of input text"""
-    model, vocab, model_config, device = load_model_and_vocab()
-
-    # Encode text
-    encoded_text = encode_text(text, vocab, model_config['max_length']).to(device)
-
-    # Make prediction
-    with torch.no_grad():
-        outputs = model(encoded_text)
-        probabilities = torch.softmax(outputs, dim=1)
-        predicted_class = torch.argmax(outputs, dim=1).item()
-        confidence = probabilities[0][predicted_class].item()
-
-    return predicted_class, confidence
-
-def get_class_name(class_id):
-    """Convert class ID to class name"""
-    class_names = {
-        0: "Technology",
-        1: "Sports",
-        2: "Science",
-        3: "Music",
-        4: "Food"
-    }
-    return class_names.get(class_id, f"Class {class_id}")
+class TransformerClassifier:
+    """Transformer text classifier for inference"""
+    
+    def __init__(self, model_path='transformer_model.pth'):
+        self.device = get_device()
+        self.model, self.vocab, self.config = self._load_model(model_path)
+        self.class_names = {
+            0: "Technology", 1: "Sports", 2: "Science", 3: "Music", 4: "Food"
+        }
+    
+    def _load_model(self, model_path):
+        """Load trained model and configuration"""
+        checkpoint = torch.load(model_path, map_location=self.device)
+        vocab = checkpoint['vocab']
+        config = checkpoint['model_config']
+        
+        model = SimpleTransformer(
+            vocab_size=config['vocab_size'],
+            d_model=config['d_model'],
+            n_heads=config['n_heads'],
+            n_layers=config['n_layers'],
+            num_classes=config['num_classes'],
+            max_length=config['max_length']
+        ).to(self.device)
+        
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.eval()
+        
+        return model, vocab, config
+    
+    def _tokenize_text(self, text):
+        """Tokenize text"""
+        text = re.sub(r'[^\w\s]', ' ', text.lower())
+        return text.split()
+    
+    def _encode_text(self, text):
+        """Encode text to tensor"""
+        tokens = self._tokenize_text(text)[:self.config['max_length']]
+        encoded = [self.vocab.get(token, self.vocab['<UNK>']) for token in tokens]
+        
+        # Pad to max_length
+        if len(encoded) < self.config['max_length']:
+            encoded.extend([self.vocab['<PAD>']] * (self.config['max_length'] - len(encoded)))
+        
+        return torch.tensor(encoded, dtype=torch.long).unsqueeze(0)
+    
+    def predict(self, text):
+        """Predict class of input text"""
+        encoded_text = self._encode_text(text).to(self.device)
+        
+        with torch.no_grad():
+            outputs = self.model(encoded_text)
+            probabilities = torch.softmax(outputs, dim=1)
+            predicted_class = torch.argmax(outputs, dim=1).item()
+            confidence = probabilities[0][predicted_class].item()
+        
+        class_name = self.class_names.get(predicted_class, f"Class {predicted_class}")
+        
+        return {
+            'class_id': predicted_class,
+            'class_name': class_name,
+            'confidence': confidence,
+            'probabilities': probabilities[0].tolist()
+        }
 
 def test_sample_texts():
     """Test the model on sample texts"""
@@ -84,57 +91,58 @@ def test_sample_texts():
         "The football match ended in overtime with an exciting goal",
         "Research shows that this method improves experimental results significantly"
     ]
-
-    print("Testing Transformer Text Classifier")
-    print("=" * 50)
-
-    for i, text in enumerate(sample_texts):
-        try:
-            predicted_class, confidence = predict_text(text)
-            class_name = get_class_name(predicted_class)
-
+    
+    try:
+        classifier = TransformerClassifier()
+        print(f"Testing Transformer Classifier on device: {classifier.device}")
+        print("=" * 60)
+        
+        for i, text in enumerate(sample_texts):
+            result = classifier.predict(text)
+            
             print(f"\nText {i+1}: {text}")
-            print(f"Predicted: {class_name} (Class {predicted_class})")
-            print(f"Confidence: {confidence:.2%}")
+            print(f"Predicted: {result['class_name']} (Class {result['class_id']})")
+            print(f"Confidence: {result['confidence']:.2%}")
+    
+    except Exception as e:
+        print(f"Error during testing: {e}")
 
-        except Exception as e:
-            print(f"Error processing text {i+1}: {e}")
 
 def interactive_mode():
     """Interactive mode for testing custom text"""
-    print("\nInteractive Mode - Enter text to classify (type 'quit' to exit)")
-    print("=" * 50)
+    try:
+        classifier = TransformerClassifier()
+        print("\nInteractive Mode - Enter text to classify (type 'quit' to exit)")
+        print("=" * 60)
+        
+        while True:
+            text = input("\nEnter text: ").strip()
+            
+            if text.lower() in ['quit', 'exit', 'q']:
+                break
+            
+            if not text:
+                print("Please enter some text.")
+                continue
+            
+            result = classifier.predict(text)
+            print(f"Predicted: {result['class_name']} (Class {result['class_id']})")
+            print(f"Confidence: {result['confidence']:.2%}")
+    
+    except Exception as e:
+        print(f"Error: {e}")
 
-    while True:
-        text = input("\nEnter text: ").strip()
-
-        if text.lower() in ['quit', 'exit', 'q']:
-            break
-
-        if not text:
-            print("Please enter some text.")
-            continue
-
-        try:
-            predicted_class, confidence = predict_text(text)
-            class_name = get_class_name(predicted_class)
-
-            print(f"Predicted: {class_name} (Class {predicted_class})")
-            print(f"Confidence: {confidence:.2%}")
-
-        except Exception as e:
-            print(f"Error: {e}")
 
 if __name__ == '__main__':
     try:
         # Test on predefined samples
         test_sample_texts()
-
+        
         # Interactive mode
         interactive_mode()
-
+        
     except FileNotFoundError:
         print("Model file 'transformer_model.pth' not found.")
         print("Please run 'python train.py' first to train the model.")
     except Exception as e:
-        print(f"Error loading model: {e}")
+        print(f"Error: {e}")

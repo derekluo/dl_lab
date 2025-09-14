@@ -4,11 +4,23 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import os
 import argparse
+
 from model import LinearRegressionModel
 from generate_data import load_train_data, check_data_files
 
+
+def get_device():
+    """Get the best available device"""
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
+    else:
+        return torch.device("cpu")
+
+
 def train_model(data_dir='data', learning_rate=0.01, epochs=100):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
 
     # Check data files
     exists, message = check_data_files(data_dir)
@@ -17,51 +29,63 @@ def train_model(data_dir='data', learning_rate=0.01, epochs=100):
         print("Run: python generate_data.py to create data files")
         return None
 
-    # Load data
+    # Load and prepare data
     X, y, y_true, W_true, B_true = load_train_data(data_dir)
     X, y = X.to(device), y.to(device)
 
-    # Initialize model
+    # Initialize model, loss, and optimizer
     model = LinearRegressionModel().to(device)
     loss_fn = nn.MSELoss()
     optimizer = optim.SGD(model.parameters(), lr=learning_rate)
 
-    print(f"Device: {device} | Samples: {len(X)} | True: W={W_true:.3f}, B={B_true:.3f}")
+    print(f"Device: {device} | Samples: {len(X)} | True params: W={W_true:.3f}, B={B_true:.3f}")
 
     # Training loop
     losses = []
     for epoch in range(epochs):
+        # Forward pass
         y_pred = model(X)
         loss = loss_fn(y_pred, y)
-        losses.append(loss.item())
 
+        # Backward pass
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
+        losses.append(loss.item())
+
         if (epoch + 1) % 20 == 0:
             print(f'Epoch {epoch+1:3d}/{epochs}, Loss: {loss.item():.4f}')
 
-    # Results
-    final_W, final_B = model.linear.weight.item(), model.linear.bias.item()
-    print(f"\nResults: Learned W={final_W:.3f}, B={final_B:.3f} | True W={W_true:.3f}, B={B_true:.3f}")
+    # Display results
+    learned_W = model.linear.weight.item()
+    learned_B = model.linear.bias.item()
+    print(f"\nResults: Learned W={learned_W:.3f}, B={learned_B:.3f} | True W={W_true:.3f}, B={B_true:.3f}")
 
     # Save model and plot
+    _save_results(model, losses, data_dir)
+    return model, losses
+
+
+def _save_results(model, losses, data_dir):
+    """Save model checkpoint and training plot"""
+    # Save model
     model_path = os.path.join(data_dir, 'linear_model.pth')
     torch.save(model.state_dict(), model_path)
 
+    # Plot and save loss curve
     plt.figure(figsize=(8, 4))
     plt.plot(losses)
     plt.title('Training Loss')
     plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.grid(True)
-    loss_curve_path = os.path.join(data_dir, 'loss_curve.png')
-    plt.savefig(loss_curve_path)
-    plt.show()
-    print(f"Model & loss curve saved to {data_dir}/")
+    plt.ylabel('MSE Loss')
+    plt.grid(True, alpha=0.3)
 
-    return model, losses
+    loss_curve_path = os.path.join(data_dir, 'loss_curve.png')
+    plt.savefig(loss_curve_path, dpi=150, bbox_inches='tight')
+    plt.show()
+
+    print(f"Model and loss curve saved to {data_dir}/")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train linear regression model')

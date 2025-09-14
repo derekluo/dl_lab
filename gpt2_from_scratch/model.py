@@ -3,155 +3,167 @@ import torch.nn as nn
 from torch.nn import functional as F
 import math
 
-# Model Architecture Hyperparameters
-context_length = 128  # Maximum sequence length the model can process
-d_model = 512        # Embedding dimension size (hidden state size)
-num_block = 12       # Number of transformer blocks in the model
-num_heads = 8        # Number of attention heads for multi-head attention
-dropout = 0.1        # Dropout rate for regularization
 
-# Set device priority: CUDA GPU > Apple M1/M2 > CPU
-device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+class GPTConfig:
+    """GPT model configuration"""
+    vocab_size = 50304
+    max_seq_len = 1024
+    n_layers = 12
+    n_heads = 12
+    n_embd = 768
+    dropout = 0.1
 
-# Set random seed for reproducibility
-TOUCH_SEED = 1337
-torch.manual_seed(TOUCH_SEED)
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
-class FeedForwardNetwork(nn.Module):
-    """Feed-forward network following attention layer in transformer block.
-    Consists of two linear transformations with a ReLU activation in between."""
-    def __init__(self):
+class FeedForward(nn.Module):
+    """Feed-forward network with GELU activation"""
+
+    def __init__(self, config):
         super().__init__()
-        self.ffn = nn.Sequential(
-            nn.Linear(d_model, 4 * d_model),     # First linear layer expands dimension
-            nn.ReLU(),                           # ReLU activation
-            nn.Linear(4 * d_model, d_model),     # Second linear layer projects back to model dimension
-            nn.Dropout(dropout),                 # Dropout for regularization
+        self.net = nn.Sequential(
+            nn.Linear(config.n_embd, 4 * config.n_embd),
+            nn.GELU(),
+            nn.Linear(4 * config.n_embd, config.n_embd),
+            nn.Dropout(config.dropout),
         )
 
     def forward(self, x):
-        return self.ffn(x)
+        return self.net(x)
 
-class Attention(nn.Module):
-    """Single head of self-attention mechanism."""
-    def __init__(self):
-        super().__init__()
-        # Linear projections for query, key, and value
-        self.Wq = nn.Linear(d_model, d_model // num_heads, bias=False)
-        self.Wk = nn.Linear(d_model, d_model // num_heads, bias=False)
-        self.Wv = nn.Linear(d_model, d_model // num_heads, bias=False)
-        # Causal mask to prevent attending to future tokens
-        self.register_buffer("mask", torch.tril(torch.ones(context_length, context_length)))
-        self.dropout = nn.Dropout(dropout)
-        
-    def forward(self, x):
-        B, T, C = x.shape  # batch_size, sequence_length, channels
-        # Project input into query, key, value vectors
-        q = self.Wq(x)    # queries
-        k = self.Wk(x)    # keys
-        v = self.Wv(x)    # values
-        
-        # Compute attention scores
-        weights = (q @ k.transpose(-2, -1)) *  math.sqrt(d_model // num_heads)
-        # Apply causal mask to prevent attending to future tokens
-        weights = weights.masked_fill(self.mask[:T, :T] == 0, float("-inf"))
-        weights = F.softmax(weights, dim=-1)
-        weights = self.dropout(weights)
-        
-        # Compute weighted sum of values
-        output = weights @ v
-        return output
+class CausalSelfAttention(nn.Module):
+    """Multi-head causal self-attention"""
 
-class MultiHeadAttention(nn.Module):
-    """Multi-head attention mechanism that runs multiple attention heads in parallel."""
-    def __init__(self):
+    def __init__(self, config):
         super().__init__()
-        self.heads = nn.ModuleList([Attention() for _ in range(num_heads)])
-        self.projection_layer = nn.Linear(d_model, d_model)
-        self.dropout = nn.Dropout(dropout)
-        
-    def forward(self, x):
-        # Run attention heads in parallel and concatenate results
-        head_outputs = [head(x) for head in self.heads]
-        head_outputs = torch.cat(head_outputs, dim=-1)
-        # Project concatenated outputs back to model dimension
-        out = self.dropout(self.projection_layer(head_outputs))
-        return out
+        assert config.n_embd % config.n_heads == 0
 
-class TransformerBlock(nn.Module):
-    """Single transformer block combining multi-head attention and feed-forward network."""
-    def __init__(self):
-        super().__init__()
-        self.ln1 = nn.LayerNorm(d_model)  # Layer norm before attention
-        self.ln2 = nn.LayerNorm(d_model)  # Layer norm before FFN
-        
-        self.mha = MultiHeadAttention()   # Multi-head attention
-        self.ffn = FeedForwardNetwork()   # Feed-forward network
-        
+        # Query, key, value projections
+        self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd)
+        self.c_proj = nn.Linear(config.n_embd, config.n_embd)
+
+        # Regularization
+        self.n_heads = config.n_heads
+        self.n_embd = config.n_embd
+        self.dropout = nn.Dropout(config.dropout)
+
+        # Causal mask
+        self.register_buffer("bias", torch.tril(torch.ones(config.max_seq_len, config.max_seq_len))
+                                    .view(1, 1, config.max_seq_len, config.max_seq_len))
+
     def forward(self, x):
-        # Apply attention with residual connection
-        x = x + self.mha(self.ln1(x))
-        # Apply FFN with residual connection
-        x = x + self.ffn(self.ln2(x))
+        B, T, C = x.size()  # batch, sequence, embedding
+
+        # Calculate Q, K, V
+        qkv = self.c_attn(x)
+        q, k, v = qkv.split(self.n_embd, dim=2)
+
+        # Reshape for multi-head attention
+        k = k.view(B, T, self.n_heads, C // self.n_heads).transpose(1, 2)
+        q = q.view(B, T, self.n_heads, C // self.n_heads).transpose(1, 2)
+        v = v.view(B, T, self.n_heads, C // self.n_heads).transpose(1, 2)
+
+        # Self-attention
+        att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
+        att = att.masked_fill(self.bias[:,:,:T,:T] == 0, float('-inf'))
+        att = F.softmax(att, dim=-1)
+        att = self.dropout(att)
+        y = att @ v  # (B, n_heads, T, head_size)
+
+        y = y.transpose(1, 2).contiguous().view(B, T, C)  # Reassemble heads
+        y = self.c_proj(y)
+
+        return y
+
+class Block(nn.Module):
+    """Transformer block: attention -> feed forward"""
+
+    def __init__(self, config):
+        super().__init__()
+        self.ln_1 = nn.LayerNorm(config.n_embd)
+        self.attn = CausalSelfAttention(config)
+        self.ln_2 = nn.LayerNorm(config.n_embd)
+        self.mlp = FeedForward(config)
+
+    def forward(self, x):
+        x = x + self.attn(self.ln_1(x))
+        x = x + self.mlp(self.ln_2(x))
         return x
 
-class Model(nn.Module):
-    """Complete transformer model for language modeling."""
-    def __init__(self, max_token_value=100080):
+class GPT(nn.Module):
+    """GPT Language Model"""
+
+    def __init__(self, config):
         super().__init__()
-        # Token embedding layer
-        self.token_embedding_lookup_table = nn.Embedding(max_token_value, d_model)
-        # Stack of transformer blocks with final layer norm
-        self.transformer_blocks = nn.Sequential(*(
-          [TransformerBlock() for _ in range(num_block)] +
-          [nn.LayerNorm(d_model)]
-        ))
-        # Output projection to vocabulary size
-        self.model_out_linear_layer = nn.Linear(d_model, max_token_value)
-    
+        self.config = config
+
+        # Token and position embeddings
+        self.wte = nn.Embedding(config.vocab_size, config.n_embd)
+        self.wpe = nn.Embedding(config.max_seq_len, config.n_embd)
+        self.drop = nn.Dropout(config.dropout)
+
+        # Transformer blocks
+        self.h = nn.ModuleList([Block(config) for _ in range(config.n_layers)])
+
+        # Final layer norm and output projection
+        self.ln_f = nn.LayerNorm(config.n_embd)
+        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+
+        # Weight tying
+        self.wte.weight = self.lm_head.weight
+
+        print(f"Number of parameters: {self.get_num_params():,}")
+
+    def get_num_params(self):
+        """Count total parameters"""
+        return sum(p.numel() for p in self.parameters())
+
     def forward(self, idx, targets=None):
-        """Forward pass of the model."""
-        B, T = idx.shape
-        
-        # Create positional encodings using sine and cosine functions
-        position_encoding_lookup_table = torch.zeros(context_length, d_model, device=device)
-        position = torch.arange(0, context_length, dtype=torch.long).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model))
-        position_encoding_lookup_table[:, 0::2] = torch.sin(position * div_term)
-        position_encoding_lookup_table[:, 1::2] = torch.cos(position * div_term)
-        position_embedding = position_encoding_lookup_table[:T, :].to(device)
-        
-        # Combine token embeddings and positional encodings
-        x = self.token_embedding_lookup_table(idx) + position_embedding
-        # Pass through transformer blocks
-        x = self.transformer_blocks(x)
-        # Project to vocabulary size
-        logits = self.model_out_linear_layer(x)
-        
-        # Calculate loss if targets are provided
+        B, T = idx.size()
+        assert T <= self.config.max_seq_len, f"Sequence length {T} exceeds maximum {self.config.max_seq_len}"
+
+        # Token and position embeddings
+        pos = torch.arange(0, T, dtype=torch.long, device=idx.device)
+        tok_emb = self.wte(idx)  # (B, T, n_embd)
+        pos_emb = self.wpe(pos)  # (T, n_embd)
+        x = self.drop(tok_emb + pos_emb)
+
+        # Forward through transformer blocks
+        for block in self.h:
+            x = block(x)
+
+        # Final layer norm and projection to vocab
+        x = self.ln_f(x)
+        logits = self.lm_head(x)
+
+        # Calculate loss if targets provided
+        loss = None
         if targets is not None:
-            B, T, C = logits.shape
-            logits.reshaped = logits.view(B * T, C)
-            targets.reshaped = targets.view(B * T)
-            loss = F.cross_entropy(input=logits.reshaped, target=targets.reshaped)
-        else:
-            loss = None
-            
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+
         return logits, loss
-    
-    def generate(self, idx, max_new_tokens=100):
-        """Generate new tokens autoregressively."""
+
+    @torch.no_grad()
+    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
+        """Generate new tokens"""
         for _ in range(max_new_tokens):
-            # Crop sequence to maximum context length
-            idx_crop = idx[:, -context_length:]
-            # Get predictions
-            logits, loss = self.forward(idx_crop)
-            # Focus on last timestep
-            logits_last_timestep = logits[:, -1, :]
-            # Get probabilities
-            probs = F.softmax(input=logits_last_timestep, dim=-1)
+            # Crop to max sequence length
+            idx_cond = idx if idx.size(1) <= self.config.max_seq_len else idx[:, -self.config.max_seq_len:]
+
+            # Forward pass
+            logits, _ = self(idx_cond)
+            logits = logits[:, -1, :] / temperature
+
+            # Top-k filtering
+            if top_k is not None:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = -float('Inf')
+
             # Sample next token
-            idx_next = torch.multinomial(input=probs, num_samples=1)
-            # Append to sequence
-            idx = torch.cat((idx, idx_next), dim=-1)
+            probs = F.softmax(logits, dim=-1)
+            idx_next = torch.multinomial(probs, num_samples=1)
+            idx = torch.cat((idx, idx_next), dim=1)
+
         return idx
+
